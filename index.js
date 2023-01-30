@@ -1,4 +1,5 @@
 "use strict";
+/// <reference path="@types/global.d.ts" />
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -27,8 +28,8 @@ pmx_1.default.initModule({
     (0, pm2_1.startPm2Connect)(moduleConfig);
     pmx_1.default.configureModule({
         human_info: [
-            ['Status', 'Module enabled'],
-            ['Debug', moduleConfig.debug ? 'Enabled' : 'Disabled'],
+            ["Status", "Module enabled"],
+            ["Debug", moduleConfig.debug ? "Enabled" : "Disabled"],
         ],
     });
 });
