@@ -1,7 +1,7 @@
 "use strict";
+/// <reference path="../@types/global.d.ts" />
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.App = void 0;
-const MONIT_ITEMS_LIMIT = 60;
 class App {
     constructor(name, instances) {
         this.pids = {};
@@ -21,7 +21,7 @@ class App {
         });
         return this;
     }
-    updatePid(pidData) {
+    updatePid(conf, pidData) {
         const pid = pidData.id;
         if (!this.pids[pid]) {
             this.pids[pid] = {
@@ -33,8 +33,8 @@ class App {
             this.updateLastIncreaseWorkersTime();
         }
         else {
-            const memoryValues = [pidData.memory, ...this.pids[pid].memory].slice(0, MONIT_ITEMS_LIMIT);
-            const cpuValues = [pidData.cpu, ...this.pids[pid].cpu].slice(0, MONIT_ITEMS_LIMIT);
+            const memoryValues = [pidData.memory, ...this.pids[pid].memory].slice(0, conf.average_worker_resources_over_seconds);
+            const cpuValues = [pidData.cpu, ...this.pids[pid].cpu].slice(0, conf.average_worker_resources_over_seconds);
             this.pids[pid].memory = memoryValues;
             this.pids[pid].cpu = cpuValues;
         }

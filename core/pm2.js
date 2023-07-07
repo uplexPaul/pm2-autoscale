@@ -1,4 +1,6 @@
 "use strict";
+/// <reference path="../@types/global.d.ts" />
+/// <reference path="../@types/pm2.d.ts" />
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -12,10 +14,8 @@ const logger_1 = require("../utils/logger");
 const WORKER_CHECK_INTERVAL = 1000;
 const SHOW_STAT_INTERVAL = 10000;
 const MEMORY_MB = 1048576;
-const MIN_SECONDS_TO_ADD_WORKER = 10;
-const MIN_SECONDS_TO_RELEASE_WORKER = 30;
 const TOTAL_CPUS = node_os_1.default.cpus().length;
-const MAX_AVAILABLE_WORKERS_COUNT = TOTAL_CPUS - 1;
+const DEFAULT_MAX_AVAILABLE_WORKERS_COUNT = TOTAL_CPUS - 1;
 const APPS = {};
 const startPm2Connect = (conf) => {
     pm2_1.default.connect((err) => {
@@ -27,6 +27,9 @@ const startPm2Connect = (conf) => {
                     return console.error(err.stack || err);
                 const allAppsPids = {};
                 apps.forEach((app) => {
+                    if (!app.name || !app.pid) {
+                        return;
+                    }
                     // Fill all apps pids
                     if (!allAppsPids[app.name]) {
                         allAppsPids[app.name] = [];
@@ -40,17 +43,18 @@ const startPm2Connect = (conf) => {
                     }
                 });
                 apps.forEach((app) => {
+                    var _a, _b;
                     const pm2_env = app.pm2_env;
                     if (pm2_env.axm_options.isModule) {
                         return;
                     }
-                    if (pm2_env.exec_mode === 'fork_mode') {
+                    if (pm2_env.exec_mode === "fork_mode") {
                         return;
                     }
                     if (!app.name || !app.pid || app.pm_id === undefined) {
                         return;
                     }
-                    if (pm2_env.status !== 'online') {
+                    if (pm2_env.status !== "online") {
                         delete APPS[app.name];
                         return;
                     }
@@ -62,10 +66,10 @@ const startPm2Connect = (conf) => {
                     if (activePids) {
                         workingApp.removeNotActivePids(activePids);
                     }
-                    workingApp.updatePid({
+                    workingApp.updatePid(conf, {
                         id: app.pid,
-                        memory: Math.round((app.monit.memory || 0) / MEMORY_MB),
-                        cpu: app.monit.cpu || 0,
+                        memory: Math.round((((_a = app.monit) === null || _a === void 0 ? void 0 : _a.memory) || 0) / MEMORY_MB),
+                        cpu: ((_b = app.monit) === null || _b === void 0 ? void 0 : _b.cpu) || 0,
                         pmId: app.pm_id,
                     });
                     processWorkingApp(conf, workingApp);
@@ -94,32 +98,43 @@ function processWorkingApp(conf, workingApp) {
         return;
     }
     const cpuValues = [...workingApp.getCpuThreshold()];
+    const cpuValuesSum = cpuValues.reduce((sum, value) => sum + value);
     const maxCpuValue = Math.max(...workingApp.getCpuThreshold());
-    const averageCpuValue = Math.round(cpuValues.reduce((sum, value) => sum + value) / cpuValues.length);
+    const averageCpuValue = Math.round(cpuValuesSum / cpuValues.length);
     const needIncreaseInstances = 
     // Increase workers if any of CPUs loaded more then "scale_cpu_threshold"
     maxCpuValue >= conf.scale_cpu_threshold &&
         // Increase workers only if we have available CPUs for that
-        workingApp.getActiveWorkersCount() < MAX_AVAILABLE_WORKERS_COUNT;
+        workingApp.getActiveWorkersCount() <
+            (conf.max_workers > 0
+                ? conf.max_workers
+                : DEFAULT_MAX_AVAILABLE_WORKERS_COUNT);
     if (needIncreaseInstances) {
         const freeMem = Math.round(node_os_1.default.freemem() / MEMORY_MB);
         const avgAppUseMemory = workingApp.getAverageUsedMemory();
-        const memoryAfterNewWorker = freeMem - avgAppUseMemory;
-        if (memoryAfterNewWorker <= 0) {
-            // Increase workers only if we have anought free memory
+        // Spawn enough workers to get the average CPU utilization below the threshold.
+        const workersToSpawn = Math.min(Math.ceil(averageCpuValue / conf.scale_cpu_threshold *
+            workingApp.getActiveWorkersCount() -
+            workingApp.getActiveWorkersCount()), 
+        // Never spawn more than we have memory for
+        Math.floor(freeMem / avgAppUseMemory));
+        // Sanity check
+        const memoryAfterNewWorker = freeMem - avgAppUseMemory * workersToSpawn;
+        if (memoryAfterNewWorker <= 0 || workersToSpawn === 0) {
+            // Increase workers only if we have enough free memory
             (0, logger_1.getLogger)().debug(`Not enought memory to increase worker for app "${workingApp.getName()}". Free memory ${freeMem}MB, App average memeory ${avgAppUseMemory}MB `);
             return;
         }
         const now = Number(new Date());
         const secondsDiff = Math.round((now - workingApp.getLastIncreaseWorkersTime()) / 1000);
-        if (secondsDiff > MIN_SECONDS_TO_ADD_WORKER) {
+        if (secondsDiff > conf.min_seconds_to_add_worker) {
             // Add small delay between increasing workers to detect load
             (0, logger_1.getLogger)().debug(`Increase workers for app "${workingApp.getName()}"`);
             workingApp.isProcessing = true;
-            pm2_1.default.scale(workingApp.getName(), '+1', () => {
+            pm2_1.default.scale(workingApp.getName(), `+${workersToSpawn}`, () => {
                 workingApp.updateLastIncreaseWorkersTime();
                 workingApp.isProcessing = false;
-                (0, logger_1.getLogger)().info(`App "${workingApp.getName()}" scaled with +1 worker`);
+                (0, logger_1.getLogger)().info(`App "${workingApp.getName()}" scaled with +${workersToSpawn} worker`);
             });
         }
     }
@@ -131,7 +146,7 @@ function processWorkingApp(conf, workingApp) {
             workingApp.getActiveWorkersCount() > workingApp.getDefaultWorkersCount()) {
             const now = Number(new Date());
             const secondsDiff = Math.round((now - workingApp.getLastDecreaseWorkersTime()) / 1000);
-            if (secondsDiff > MIN_SECONDS_TO_RELEASE_WORKER) {
+            if (secondsDiff > conf.min_seconds_to_release_worker) {
                 (0, logger_1.getLogger)().debug(`Decrease workers for app "${workingApp.getName()}"`);
                 const newWorkers = workingApp.getActiveWorkersCount() - 1;
                 workingApp.isProcessing = true;
@@ -139,7 +154,7 @@ function processWorkingApp(conf, workingApp) {
                     pm2_1.default.scale(workingApp.getName(), newWorkers, () => {
                         workingApp.updateLastDecreaseWorkersTime();
                         workingApp.isProcessing = false;
-                        (0, logger_1.getLogger)().info(`App "${workingApp.getName()}" decresed one worker`);
+                        (0, logger_1.getLogger)().info(`App "${workingApp.getName()}" decreased one worker`);
                     });
                 }
             }
