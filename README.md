@@ -1,14 +1,14 @@
 # PM2-Autoscale [![npm version](https://badge.fury.io/js/pm2-autoscale.svg)](https://www.npmjs.com/package/pm2-autoscale)
 
-PM2 module to help dynamically scale applications based on utilization demand.
+PM2 is a module that helps dynamically scale applications based on utilization demand.
 
 ## Motivation
 
-By default PM2 runs application with specified number of instances which is not suatable when you have few application on one server with many CPUs and you can not predict which application will load your server. For example you have 48 CPUs and if you run application with `instances=max` PM2 will run 48 instances and every instance usually uses at least 100Mb on the Memory (~5GB for all instances). So if you have 10 application it means you will use about 50GB of the server memory without server load.
+By default, PM2 runs the application with a specified number of instances, which is not suitable when you have a few applications on one server with many CPUs, and you cannot predict which application will load your server. For example, if you have 48 CPUs and you run the application with instances=max, PM2 will run 48 instances, and every instance usually uses at least 100Mb of memory (~5GB for all instances). So, if you have 10 applications, it means you will use about 50GB of server memory without server load.
 
 ## Solution
 
-The module helps dynamically increase application instances depends on CPUs utilization of every application. You can run you application with minimum required instances. When module detects that CPU utilisation is higher then `scale_cpu_threshold` it will start increasing instances to max `CPUs-1` and if server has available free memory. When module detects CPU utilization is decreasing it will stop useless instances.
+The module helps dynamically increase application instances depending on CPU utilization of every application. You can run your application with the minimum required instances. When the module detects that CPU utilization is higher than scale_cpu_threshold, it will start increasing instances to a maximum of CPUs-1, provided that the server has available free memory. When the module detects that CPU utilization is decreasing, it will stop the unnecessary instances.
 
 ## Install
 
