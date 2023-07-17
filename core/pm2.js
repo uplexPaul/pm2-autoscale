@@ -101,6 +101,9 @@ function processWorkingApp(conf, workingApp) {
     const cpuValuesSum = cpuValues.reduce((sum, value) => sum + value);
     const maxCpuValue = Math.max(...workingApp.getCpuThreshold());
     const averageCpuValue = Math.round(cpuValuesSum / cpuValues.length);
+    (0, logger_1.getLogger)().debug(`cpuValuesSum: "${cpuValuesSum}"`);
+    (0, logger_1.getLogger)().debug(`maxCpuValue: "${maxCpuValue}"`);
+    (0, logger_1.getLogger)().debug(`averageCpuValue: "${averageCpuValue}"`);
     const needIncreaseInstances = 
     // Increase workers if any of CPUs loaded more then "scale_cpu_threshold"
     maxCpuValue >= conf.scale_cpu_threshold &&
@@ -122,7 +125,7 @@ function processWorkingApp(conf, workingApp) {
         const memoryAfterNewWorker = freeMem - avgAppUseMemory * workersToSpawn;
         if (memoryAfterNewWorker <= 0 || workersToSpawn === 0) {
             // Increase workers only if we have enough free memory
-            (0, logger_1.getLogger)().debug(`Not enought memory to increase worker for app "${workingApp.getName()}". Free memory ${freeMem}MB, App average memeory ${avgAppUseMemory}MB `);
+            (0, logger_1.getLogger)().debug(`Not enough memory to increase worker for app "${workingApp.getName()}". Free memory ${freeMem}MB, App average memeory ${avgAppUseMemory}MB `);
             return;
         }
         const now = Number(new Date());
