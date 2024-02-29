@@ -1,10 +1,8 @@
-/// <reference path="../@types/global.d.ts" />
-
-type IPidDataInput = {
-  id: number;
-  pmId: number;
-  memory: number;
-  cpu: number;
+export type IPidDataInput = {
+    id: number;
+    pmId: number;
+    memory: number;
+    cpu: number;
 };
 
 type IPidData = {
@@ -13,6 +11,8 @@ type IPidData = {
   memory: number[];
   cpu: number[];
 };
+
+const MONIT_ITEMS_LIMIT = 30;
 
 export class App {
   private readonly pids: { [key: number]: IPidData } = {};
